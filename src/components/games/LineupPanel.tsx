@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Player, InningAssignment, BattingOrderEntry, Position } from '../../types'
-import { INFIELD_POSITIONS, OUTFIELD_POSITIONS } from '../../types'
+import { INFIELD_POSITIONS, ALL_OUTFIELD_POSITIONS } from '../../types'
 import { saveGameLineup, saveGameBattingOrder } from '../../lib/store'
 import { generateLineup } from '../../lib/lineupGenerator'
 
@@ -12,6 +12,7 @@ interface Props {
   battingOrder: BattingOrderEntry[]
   dirty: boolean
   attendanceStale: boolean
+  absentPlayersInLineup: Player[]
   onAssignmentsChange: (assignments: InningAssignment[]) => void
   onBattingOrderChange: (battingOrder: BattingOrderEntry[]) => void
   onDirtyChange: (dirty: boolean) => void
@@ -19,15 +20,32 @@ interface Props {
   onSaved: () => void
 }
 
-const ALL_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LC', 'RC', 'RF', 'BENCH']
 const INNINGS = [1, 2, 3, 4]
 
 function positionColor(pos: Position): string {
   if (pos === 'BENCH') return 'bg-gray-100 text-gray-400'
   if (pos === 'C') return 'bg-orange-100 text-orange-800'
   if ((INFIELD_POSITIONS as Position[]).includes(pos)) return 'bg-blue-100 text-blue-800'
-  if ((OUTFIELD_POSITIONS as Position[]).includes(pos)) return 'bg-green-100 text-green-700'
+  if ((ALL_OUTFIELD_POSITIONS as Position[]).includes(pos)) return 'bg-green-100 text-green-700'
   return 'bg-gray-100 text-gray-500'
+}
+
+function canReplaceFromBench(assignments: InningAssignment[], absentPlayerIds: string[]): boolean {
+  const sim = [...assignments]
+  for (const absentId of absentPlayerIds) {
+    for (const inning of INNINGS) {
+      const fieldIdx = sim.findIndex(
+        (a) => a.inning === inning && a.player_id === absentId && a.position !== 'BENCH'
+      )
+      if (fieldIdx < 0) continue
+      const benchIdx = sim.findIndex(
+        (a) => a.inning === inning && a.position === 'BENCH' && !absentPlayerIds.includes(a.player_id)
+      )
+      if (benchIdx < 0) return false
+      sim[benchIdx] = { ...sim[benchIdx], position: sim[fieldIdx].position }
+    }
+  }
+  return true
 }
 
 export default function LineupPanel({
@@ -38,6 +56,7 @@ export default function LineupPanel({
   battingOrder,
   dirty,
   attendanceStale,
+  absentPlayersInLineup,
   onAssignmentsChange,
   onBattingOrderChange,
   onDirtyChange,
@@ -49,13 +68,20 @@ export default function LineupPanel({
 
   const playerMap = Object.fromEntries(players.map((p) => [p.id, p]))
 
+  const n = attendingPlayers.length
+  const availablePositions: Position[] = [
+    'P', 'C', '1B', '2B', '3B', 'SS',
+    ...(n === 9 ? ['LF', 'CF', 'RF'] : ['LF', 'LC', 'RC', 'RF']) as Position[],
+    ...(n > 10 ? ['BENCH'] as Position[] : []),
+  ]
+
   const hasLineup = assignments.length > 0
   const hasBattingOrder = battingOrder.length > 0
   const hasData = hasLineup || hasBattingOrder
 
   const handleGenerateAll = () => {
-    if (attendingPlayers.length < 10) {
-      setError(`Need at least 10 attending players (have ${attendingPlayers.length}).`)
+    if (attendingPlayers.length < 9) {
+      setError(`Need at least 9 attending players (have ${attendingPlayers.length}).`)
       return
     }
     try {
@@ -71,8 +97,8 @@ export default function LineupPanel({
   }
 
   const handleGeneratePositions = () => {
-    if (attendingPlayers.length < 10) {
-      setError(`Need at least 10 attending players (have ${attendingPlayers.length}).`)
+    if (attendingPlayers.length < 9) {
+      setError(`Need at least 9 attending players (have ${attendingPlayers.length}).`)
       return
     }
     try {
@@ -95,6 +121,38 @@ export default function LineupPanel({
     onBattingOrderChange(genO)
     onDirtyChange(true)
     onLineupGenerated()
+    setError(null)
+  }
+
+  const handleRemoveAbsentFromLineup = () => {
+    const absentIds = absentPlayersInLineup.map((p) => p.id)
+    let newAssignments = [...assignments]
+    let newBattingOrder = [...battingOrder]
+
+    for (const absentId of absentIds) {
+      for (const inning of INNINGS) {
+        const fieldIdx = newAssignments.findIndex(
+          (a) => a.inning === inning && a.player_id === absentId && a.position !== 'BENCH'
+        )
+        if (fieldIdx < 0) continue
+        const benchIdx = newAssignments.findIndex(
+          (a) => a.inning === inning && a.position === 'BENCH' && !absentIds.includes(a.player_id)
+        )
+        if (benchIdx >= 0) {
+          newAssignments[benchIdx] = { ...newAssignments[benchIdx], position: newAssignments[fieldIdx].position }
+        }
+      }
+      newAssignments = newAssignments.filter((a) => a.player_id !== absentId)
+      newBattingOrder = newBattingOrder.filter((b) => b.player_id !== absentId)
+    }
+
+    newBattingOrder = newBattingOrder
+      .sort((a, b) => a.batting_slot - b.batting_slot)
+      .map((b, i) => ({ ...b, batting_slot: i + 1 }))
+
+    onAssignmentsChange(newAssignments)
+    onBattingOrderChange(newBattingOrder)
+    onDirtyChange(true)
     setError(null)
   }
 
@@ -147,7 +205,7 @@ export default function LineupPanel({
   const ifInnings = new Map<string, number>()
   const benchInnings = new Map<string, number>()
   assignments.forEach((a) => {
-    if ((OUTFIELD_POSITIONS as Position[]).includes(a.position)) {
+    if ((ALL_OUTFIELD_POSITIONS as Position[]).includes(a.position)) {
       ofInnings.set(a.player_id, (ofInnings.get(a.player_id) ?? 0) + 1)
     } else if (a.position === 'BENCH') {
       benchInnings.set(a.player_id, (benchInnings.get(a.player_id) ?? 0) + 1)
@@ -219,7 +277,31 @@ export default function LineupPanel({
         </div>
       )}
 
-      {attendanceStale && (
+      {absentPlayersInLineup.length > 0 && hasLineup && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <strong>{absentPlayersInLineup.map((p) => p.name).join(', ')}</strong>{' '}
+          {absentPlayersInLineup.length === 1 ? 'is' : 'are'} marked out but{' '}
+          {absentPlayersInLineup.length === 1 ? 'still appears' : 'still appear'} in the lineup.
+          <div className="flex flex-wrap gap-2 mt-2">
+            {canReplaceFromBench(assignments, absentPlayersInLineup.map((p) => p.id)) && (
+              <button
+                onClick={handleRemoveAbsentFromLineup}
+                className="px-3 py-1 rounded-md bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+              >
+                Remove from lineup
+              </button>
+            )}
+            <button
+              onClick={handleGenerateAll}
+              className="px-3 py-1 rounded-md bg-white border border-red-300 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors"
+            >
+              Regenerate lineup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {attendanceStale && absentPlayersInLineup.length === 0 && (
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
           <strong>Attendance has changed</strong> since this lineup was generated. It may no longer be valid — consider regenerating.
         </div>
@@ -313,7 +395,7 @@ export default function LineupPanel({
                                   }
                                   className="text-xs font-bold px-2 py-0.5 bg-transparent border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:rounded-md"
                                 >
-                                  {ALL_POSITIONS.map((p) => (
+                                  {availablePositions.map((p) => (
                                     <option key={p} value={p}>
                                       {p}
                                     </option>

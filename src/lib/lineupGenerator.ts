@@ -1,5 +1,5 @@
 import type { Player, Position, InningAssignment, BattingOrderEntry } from '../types'
-import { INFIELD_POSITIONS, OUTFIELD_POSITIONS } from '../types'
+import { INFIELD_POSITIONS, OUTFIELD_POSITIONS, TRADITIONAL_OUTFIELD_POSITIONS } from '../types'
 
 export interface GeneratedLineup {
   assignments: Omit<InningAssignment, 'id'>[]
@@ -112,9 +112,11 @@ function assignInningPositions(
   hasPlayedOutfield: Set<string>,
   lastInningOF: Set<string>,
   forcedToOFIds: string[],
-  playedPositions: Map<string, Set<Position>>
+  playedPositions: Map<string, Set<Position>>,
+  outfieldPositions: Position[]
 ): Omit<InningAssignment, 'id'>[] {
   const isStrongInning = inning === 1 || inning === 4
+  const ofCount = outfieldPositions.length
 
   // Score for outfield suitability (higher = goes to OF)
   const ofScores = active.map((p) => {
@@ -128,8 +130,8 @@ function assignInningPositions(
 
   ofScores.sort((a, b) => b.s - a.s)
 
-  const ofPlayers = ofScores.slice(0, 4).map((x) => x.p)
-  const remaining = ofScores.slice(4).map((x) => x.p)
+  const ofPlayers = ofScores.slice(0, ofCount).map((x) => x.p)
+  const remaining = ofScores.slice(ofCount).map((x) => x.p)
 
   // Score for catcher suitability; strongly penalize repeat catchers
   const cScores = remaining.map((p) => {
@@ -146,7 +148,7 @@ function assignInningPositions(
   const result: Omit<InningAssignment, 'id'>[] = []
   const gameId = '' // filled in by caller
 
-  const ofAssignment = assignNoRepeat(ofPlayers, [...OUTFIELD_POSITIONS], playedPositions)
+  const ofAssignment = assignNoRepeat(ofPlayers, [...outfieldPositions], playedPositions)
   ofPlayers.forEach((p) =>
     result.push({ game_id: gameId, inning, player_id: p.id, position: ofAssignment.get(p.id)! })
   )
@@ -185,11 +187,13 @@ export function generateLineup(
   players: Player[],
   gameId: string
 ): GeneratedLineup {
-  if (players.length < 10) {
-    throw new Error(`Need at least 10 attending players, got ${players.length}`)
+  if (players.length < 9) {
+    throw new Error(`Need at least 9 attending players, got ${players.length}`)
   }
 
-  const benchPerInning = Math.max(0, players.length - 10)
+  const outfieldPositions = players.length === 9 ? TRADITIONAL_OUTFIELD_POSITIONS : OUTFIELD_POSITIONS
+  const fieldPositionCount = 6 + outfieldPositions.length  // SS/P/C/1B/2B/3B + OF
+  const benchPerInning = Math.max(0, players.length - fieldPositionCount)
   const benchSchedule = createBenchSchedule(players, benchPerInning)
 
   const allAssignments: Omit<InningAssignment, 'id'>[] = []
@@ -213,7 +217,8 @@ export function generateLineup(
       hasPlayedOutfield,
       lastInningOF,
       forcedToOFIds,
-      playedPositions
+      playedPositions,
+      outfieldPositions
     )
 
     // Fix game_id (was set to '' placeholder above)
@@ -228,7 +233,7 @@ export function generateLineup(
     // Update outfield history for next inning
     const thisOF = new Set(
       withGameId
-        .filter((a) => (OUTFIELD_POSITIONS as Position[]).includes(a.position))
+        .filter((a) => (outfieldPositions as Position[]).includes(a.position))
         .map((a) => a.player_id)
     )
     thisOF.forEach((id) => hasPlayedOutfield.add(id))

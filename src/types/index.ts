@@ -25,12 +25,14 @@ export interface GameAttendance {
 
 export type Position =
   | 'P' | 'C' | '1B' | '2B' | '3B' | 'SS'
-  | 'LF' | 'LC' | 'RC' | 'RF'
+  | 'LF' | 'CF' | 'LC' | 'RC' | 'RF'
   | 'BENCH'
 
 export const INFIELD_POSITIONS: Position[] = ['P', '1B', '2B', '3B', 'SS']
 export const OUTFIELD_POSITIONS: Position[] = ['LF', 'LC', 'RC', 'RF']
-export const ALL_FIELD_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LC', 'RC', 'RF']
+export const TRADITIONAL_OUTFIELD_POSITIONS: Position[] = ['LF', 'CF', 'RF']
+export const ALL_OUTFIELD_POSITIONS: Position[] = ['LF', 'CF', 'LC', 'RC', 'RF']
+export const ALL_FIELD_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'LC', 'RC', 'RF']
 
 export interface InningAssignment {
   id?: string

@@ -202,6 +202,15 @@ export default function GameDetail() {
     ([...lineupSnapshotIds].some((pid) => !currentAttendingIds.has(pid)) ||
       [...currentAttendingIds].some((pid) => !lineupSnapshotIds.has(pid)))
 
+  const lineupPlayerIds = new Set([
+    ...workingAssignments.map((a) => a.player_id),
+    ...workingBattingOrder.map((b) => b.player_id),
+  ])
+  const absentPlayersInLineup = players.filter((p) => {
+    const isAbsent = attendance.find((a) => a.player_id === p.id)?.attending === false
+    return isAbsent && lineupPlayerIds.has(p.id)
+  })
+
   const handleLineupGenerated = useCallback(() => {
     setLineupSnapshotIds(new Set(attendingPlayers.map((p) => p.id)))
   }, [attendingPlayers])
@@ -318,6 +327,7 @@ export default function GameDetail() {
           battingOrder={workingBattingOrder}
           dirty={lineupDirty}
           attendanceStale={lineupIsStale}
+          absentPlayersInLineup={absentPlayersInLineup}
           onAssignmentsChange={setWorkingAssignments}
           onBattingOrderChange={setWorkingBattingOrder}
           onDirtyChange={setLineupDirty}
