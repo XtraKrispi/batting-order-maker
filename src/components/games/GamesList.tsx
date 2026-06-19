@@ -21,7 +21,7 @@ interface AddGameFormProps {
 
 function AddGameForm({ onSave, onCancel }: AddGameFormProps) {
   const today = new Date().toISOString().split('T')[0]
-  const [form, setForm] = useState({ date: today, opponent: '', notes: '' })
+  const [form, setForm] = useState({ date: today, opponent: '', notes: '', is_home: true })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,6 +29,7 @@ function AddGameForm({ onSave, onCancel }: AddGameFormProps) {
       date: form.date,
       opponent: form.opponent.trim() || null,
       notes: form.notes.trim() || null,
+      is_home: form.is_home,
     })
   }
 
@@ -62,6 +63,27 @@ function AddGameForm({ onSave, onCancel }: AddGameFormProps) {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Team name (optional)"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Home / Away
+            </label>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden w-fit text-sm">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, is_home: true }))}
+                className={`px-4 py-1.5 font-medium transition-colors ${form.is_home ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Home
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, is_home: false }))}
+                className={`px-4 py-1.5 font-medium transition-colors border-l border-gray-300 ${!form.is_home ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Away
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -200,7 +222,9 @@ export default function GamesList() {
                     {formatDate(game.date)}
                   </p>
                   {game.opponent && (
-                    <p className="text-sm text-gray-500 mt-0.5">vs. {game.opponent}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {game.is_home === false ? '@' : 'vs.'} {game.opponent}
+                    </p>
                   )}
                   {game.notes && (
                     <p className="text-sm text-gray-400 mt-0.5 italic">{game.notes}</p>

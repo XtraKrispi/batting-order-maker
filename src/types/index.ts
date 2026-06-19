@@ -13,6 +13,7 @@ export interface Game {
   date: string
   opponent: string | null
   notes: string | null
+  is_home?: boolean
   created_at: string
 }
 
