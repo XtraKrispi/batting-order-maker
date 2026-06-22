@@ -46,7 +46,7 @@ export function printLineup(
     .join('')
 
   const isHome = game.is_home !== false
-  const usLabel = 'Us'
+  const usLabel = 'Red Sox'
   const themLabel = game.opponent ? escapeHtml(game.opponent) : 'Them'
   const scoreInningHeaders = INNINGS.map((i) => `<th class="score-cell">${i}</th>`).join('')
   const scoreBlankCells = INNINGS.map(() => `<td class="score-cell"></td>`).join('')
@@ -69,7 +69,7 @@ export function printLineup(
     td:first-child, th:first-child { text-align: right; width: 2em; }
     .score-table { width: auto; margin-bottom: 16px; }
     .score-table th, .score-table td { text-align: center; }
-    .score-table th.team-col, .score-table td.team-col { text-align: left; min-width: 6em; }
+    .score-table th.team-col, .score-table td.team-col { text-align: left; min-width: 9em; white-space: nowrap; }
     .score-cell { min-width: 2.8em; height: 2em; }
     .score-table td.total-cell { min-width: 3em; font-weight: bold; }
     @media print {
